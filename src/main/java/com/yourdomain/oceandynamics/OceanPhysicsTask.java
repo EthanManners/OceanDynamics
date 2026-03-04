@@ -70,14 +70,13 @@ public final class OceanPhysicsTask implements Runnable {
         Vector2 forceDir = basePush.normalize();
         double alignment = referenceDir.dot(forceDir);
         Vector2 push = basePush;
-        Vector2 out = velocity;
         if (alignment > 0.0) {
             push = push.multiply(1.0 + alignment * (withMultiplier - 1.0));
         } else if (alignment < 0.0) {
-            double dragFactor = Math.max(0.0, 1.0 - againstDrag * Math.abs(alignment));
-            out = out.multiply(dragFactor);
+            double againstFactor = 1.0 + againstDrag * Math.abs(alignment);
+            push = push.multiply(againstFactor);
         }
-        return out.add(push);
+        return velocity.add(push);
     }
 
     private void showCompassGuidance(Vehicle boat, OceanDynamicsConfig cfg) {
