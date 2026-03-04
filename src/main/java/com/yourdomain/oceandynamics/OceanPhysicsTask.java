@@ -44,20 +44,19 @@ public final class OceanPhysicsTask implements Runnable {
     private void applyBoatPhysics(Vehicle boat, OceanDynamicsConfig cfg) {
         Vector vel = boat.getVelocity();
         Vector2 horizontal = new Vector2(vel.getX(), vel.getZ());
-        double speed = horizontal.length();
+        Vector2 forwardDir = yawToDir(boat.getLocation().getYaw());
 
-        Vector2 referenceDir = speed > 1.0E-4 ? horizontal.normalize() : yawToDir(boat.getLocation().getYaw());
         Vector2 currentBaseEffect = cfg.getCurrentAt(boat.getLocation().getX(), boat.getLocation().getZ()).multiply(cfg.currentPush);
         Vector2 windBaseEffect = plugin.getWindManager().getWindVector();
 
         Vector2 pushed = horizontal;
-        pushed = applyAlignedSpeedEffect(pushed, referenceDir, currentBaseEffect, cfg.currentWithMultiplier, cfg.currentAgainstDrag);
-        pushed = applyAlignedSpeedEffect(pushed, referenceDir, windBaseEffect, cfg.windWithMultiplier, cfg.windAgainstDrag);
+        pushed = applyAlignedSpeedEffect(pushed, forwardDir, currentBaseEffect, cfg.currentWithMultiplier, cfg.currentAgainstDrag);
+        pushed = applyAlignedSpeedEffect(pushed, forwardDir, windBaseEffect, cfg.windWithMultiplier, cfg.windAgainstDrag);
 
         double cap = cfg.maxHorizontalSpeed;
         if (hasCrewBonus(boat)) {
             cap *= cfg.crewBonusMultiplier;
-            Vector2 forward = yawToDir(boat.getLocation().getYaw()).multiply(0.015 * (cfg.crewBonusMultiplier - 1.0) * 10.0);
+            Vector2 forward = forwardDir.multiply(0.015 * (cfg.crewBonusMultiplier - 1.0) * 10.0);
             pushed = pushed.add(forward);
         }
 
@@ -65,28 +64,32 @@ public final class OceanPhysicsTask implements Runnable {
         boat.setVelocity(new Vector(pushed.x(), vel.getY(), pushed.z()));
     }
 
-    private Vector2 applyAlignedSpeedEffect(Vector2 velocity, Vector2 referenceDir, Vector2 baseEffect, double withMultiplier, double againstDrag) {
+    private Vector2 applyAlignedSpeedEffect(Vector2 velocity, Vector2 forwardDir, Vector2 baseEffect, double withMultiplier, double againstDrag) {
         double baseMagnitude = baseEffect.length();
         if (baseMagnitude < 1.0E-8) {
             return velocity;
         }
 
         Vector2 effectDirection = baseEffect.normalize();
-        double alignment = mapAlignment(referenceDir, effectDirection);
+        double alignment = mapAlignment(forwardDir, effectDirection);
         if (Math.abs(alignment) < 1.0E-8) {
             return velocity;
         }
 
-        double speed = velocity.length();
-        double deltaSpeed = 0.0;
+        double forwardSpeed = velocity.dot(forwardDir);
+        Vector2 lateralComponent = velocity.add(forwardDir.multiply(-forwardSpeed));
+
+        double deltaSpeed;
         if (alignment > 0.0) {
             double boostScale = 1.0 + alignment * (withMultiplier - 1.0);
             deltaSpeed = baseMagnitude * boostScale;
         } else {
-            double slowdown = speed * againstDrag * Math.abs(alignment);
-            deltaSpeed = -Math.min(speed, slowdown);
+            double slowdown = Math.max(0.0, forwardSpeed) * againstDrag * Math.abs(alignment);
+            deltaSpeed = -Math.min(Math.max(0.0, forwardSpeed), slowdown);
         }
-        return velocity.add(referenceDir.multiply(deltaSpeed));
+
+        double nextForwardSpeed = forwardSpeed + deltaSpeed;
+        return forwardDir.multiply(nextForwardSpeed).add(lateralComponent);
     }
 
     private double mapAlignment(Vector2 referenceDir, Vector2 effectDirection) {
