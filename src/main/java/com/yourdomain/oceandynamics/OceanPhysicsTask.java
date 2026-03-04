@@ -41,9 +41,7 @@ public final class OceanPhysicsTask implements Runnable {
     private void applyBoatPhysics(Vehicle boat, OceanDynamicsConfig cfg) {
         Vector vel = boat.getVelocity();
         Vector2 horizontal = new Vector2(vel.getX(), vel.getZ());
-        double speed = horizontal.length();
-
-        Vector2 referenceDir = speed > 1.0E-4 ? horizontal.normalize() : yawToDir(boat.getLocation().getYaw());
+        Vector2 referenceDir = yawToDir(boat.getLocation().getYaw());
         Vector2 currentCellVec = cfg.getCurrentAt(boat.getLocation().getX(), boat.getLocation().getZ());
         Vector2 currentBasePush = currentCellVec.multiply(cfg.currentPush);
         Vector2 windBasePush = plugin.getWindManager().getWindVector();
@@ -67,16 +65,41 @@ public final class OceanPhysicsTask implements Runnable {
         if (basePush.length() < 1.0E-8) {
             return velocity;
         }
+
         Vector2 forceDir = basePush.normalize();
-        double alignment = referenceDir.dot(forceDir);
+        double alignment = clamp(referenceDir.dot(forceDir), -1.0, 1.0);
+        double angleDegrees = Math.toDegrees(Math.acos(alignment));
+        double bandedFactor = getBandedAlignmentFactor(angleDegrees);
+
         Vector2 push = basePush;
-        if (alignment > 0.0) {
-            push = push.multiply(1.0 + alignment * (withMultiplier - 1.0));
-        } else if (alignment < 0.0) {
-            double againstFactor = 1.0 + againstDrag * Math.abs(alignment);
+        if (bandedFactor >= 0.0) {
+            double withFactor = 1.0 + bandedFactor * (withMultiplier - 1.0);
+            push = push.multiply(withFactor);
+        } else {
+            double againstFactor = 1.0 + (-bandedFactor) * againstDrag;
             push = push.multiply(againstFactor);
         }
+
         return velocity.add(push);
+    }
+
+    private double getBandedAlignmentFactor(double angleDegrees) {
+        if (angleDegrees <= 10.0) {
+            return 1.0;
+        }
+        if (angleDegrees < 90.0) {
+            int band = (int) Math.ceil((angleDegrees - 10.0) / 10.0);
+            return 1.0 - (band / 8.0);
+        }
+        if (angleDegrees == 90.0) {
+            return 0.0;
+        }
+        int band = (int) Math.ceil((angleDegrees - 90.0) / 10.0);
+        return -(band / 9.0);
+    }
+
+    private double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private void showCompassGuidance(Vehicle boat, OceanDynamicsConfig cfg) {
