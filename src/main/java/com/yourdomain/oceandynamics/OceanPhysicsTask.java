@@ -10,6 +10,9 @@ import org.bukkit.util.Vector;
 import java.util.List;
 
 public final class OceanPhysicsTask implements Runnable {
+    private static final double ALIGNMENT_TOLERANCE_DEGREES = 10.0;
+    private static final double ALIGNMENT_BAND_DEGREES = 10.0;
+
     private final OceanDynamics plugin;
 
     public OceanPhysicsTask(OceanDynamics plugin) {
@@ -44,13 +47,12 @@ public final class OceanPhysicsTask implements Runnable {
         double speed = horizontal.length();
 
         Vector2 referenceDir = speed > 1.0E-4 ? horizontal.normalize() : yawToDir(boat.getLocation().getYaw());
-        Vector2 currentCellVec = cfg.getCurrentAt(boat.getLocation().getX(), boat.getLocation().getZ());
-        Vector2 currentBasePush = currentCellVec.multiply(cfg.currentPush);
-        Vector2 windBasePush = plugin.getWindManager().getWindVector();
+        Vector2 currentBaseEffect = cfg.getCurrentAt(boat.getLocation().getX(), boat.getLocation().getZ()).multiply(cfg.currentPush);
+        Vector2 windBaseEffect = plugin.getWindManager().getWindVector();
 
         Vector2 pushed = horizontal;
-        pushed = applyAlignedForce(pushed, referenceDir, currentBasePush, cfg.currentWithMultiplier, cfg.currentAgainstDrag);
-        pushed = applyAlignedForce(pushed, referenceDir, windBasePush, cfg.windWithMultiplier, cfg.windAgainstDrag);
+        pushed = applyAlignedSpeedEffect(pushed, referenceDir, currentBaseEffect, cfg.currentWithMultiplier, cfg.currentAgainstDrag);
+        pushed = applyAlignedSpeedEffect(pushed, referenceDir, windBaseEffect, cfg.windWithMultiplier, cfg.windAgainstDrag);
 
         double cap = cfg.maxHorizontalSpeed;
         if (hasCrewBonus(boat)) {
@@ -63,21 +65,45 @@ public final class OceanPhysicsTask implements Runnable {
         boat.setVelocity(new Vector(pushed.x(), vel.getY(), pushed.z()));
     }
 
-    private Vector2 applyAlignedForce(Vector2 velocity, Vector2 referenceDir, Vector2 basePush, double withMultiplier, double againstDrag) {
-        if (basePush.length() < 1.0E-8) {
+    private Vector2 applyAlignedSpeedEffect(Vector2 velocity, Vector2 referenceDir, Vector2 baseEffect, double withMultiplier, double againstDrag) {
+        double baseMagnitude = baseEffect.length();
+        if (baseMagnitude < 1.0E-8) {
             return velocity;
         }
-        Vector2 forceDir = basePush.normalize();
-        double alignment = referenceDir.dot(forceDir);
-        Vector2 push = basePush;
-        Vector2 out = velocity;
-        if (alignment > 0.0) {
-            push = push.multiply(1.0 + alignment * (withMultiplier - 1.0));
-        } else if (alignment < 0.0) {
-            double dragFactor = Math.max(0.0, 1.0 - againstDrag * Math.abs(alignment));
-            out = out.multiply(dragFactor);
+
+        Vector2 effectDirection = baseEffect.normalize();
+        double alignment = mapAlignment(referenceDir, effectDirection);
+        if (Math.abs(alignment) < 1.0E-8) {
+            return velocity;
         }
-        return out.add(push);
+
+        double speed = velocity.length();
+        double deltaSpeed = 0.0;
+        if (alignment > 0.0) {
+            double boostScale = 1.0 + alignment * (withMultiplier - 1.0);
+            deltaSpeed = baseMagnitude * boostScale;
+        } else {
+            double slowdown = speed * againstDrag * Math.abs(alignment);
+            deltaSpeed = -Math.min(speed, slowdown);
+        }
+        return velocity.add(referenceDir.multiply(deltaSpeed));
+    }
+
+    private double mapAlignment(Vector2 referenceDir, Vector2 effectDirection) {
+        double dot = Math.max(-1.0, Math.min(1.0, referenceDir.dot(effectDirection)));
+        double angle = Math.toDegrees(Math.acos(dot));
+        double snappedAngle = Math.round(angle / ALIGNMENT_BAND_DEGREES) * ALIGNMENT_BAND_DEGREES;
+
+        if (snappedAngle <= ALIGNMENT_TOLERANCE_DEGREES) {
+            return 1.0;
+        }
+        if (snappedAngle < 90.0) {
+            return (90.0 - snappedAngle) / (90.0 - ALIGNMENT_TOLERANCE_DEGREES);
+        }
+        if (snappedAngle < 180.0 - ALIGNMENT_TOLERANCE_DEGREES) {
+            return -((snappedAngle - 90.0) / (90.0 - ALIGNMENT_TOLERANCE_DEGREES));
+        }
+        return -1.0;
     }
 
     private void showCompassGuidance(Vehicle boat, OceanDynamicsConfig cfg) {
