@@ -49,6 +49,10 @@ public final class BoatMotionListener implements Listener {
             clearBoatCache(boat.getUniqueId());
             return;
         }
+        if (!isDriverActivelyPropelling(boat)) {
+            clearBoatCache(boat.getUniqueId());
+            return;
+        }
 
         Vector fwd = boat.getLocation().getDirection().setY(0);
         if (fwd.lengthSquared() < 1e-9) {
@@ -154,6 +158,12 @@ public final class BoatMotionListener implements Listener {
 
     private void clearBoatCache(UUID boatId) {
         lastSpeed.remove(boatId);
+    }
+
+    private boolean isDriverActivelyPropelling(Boat boat) {
+        double activationMinVanillaSpeed = plugin.getConfig().getDouble("activationMinVanillaSpeed", 0.04);
+        Vector vel = boat.getVelocity().clone().setY(0);
+        return vel.lengthSquared() >= activationMinVanillaSpeed * activationMinVanillaSpeed;
     }
 
     private double alignment(Vector forward, Vector effect) {

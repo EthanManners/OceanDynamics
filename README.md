@@ -9,6 +9,8 @@ This plugin uses **VehicleMoveEvent velocity override (SpeedyBoats-style)** for 
 - velocity continuously aligned to boat facing direction,
 - currents/wind translated into stable forward speed changes.
 
+Speed adjustments only apply once the boat already has small horizontal motion (vanilla rowing threshold), so idle boats do not auto-cruise when a player is just seated.
+
 ## Features
 
 - **500x500 cell vector field currents** (configurable `cellSize` and full 2D vector grid).
