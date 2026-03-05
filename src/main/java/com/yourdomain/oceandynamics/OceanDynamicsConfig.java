@@ -93,20 +93,34 @@ public final class OceanDynamicsConfig {
     }
 
     public Vector2 getCurrentAt(double x, double z) {
-        int cellX = (int) Math.floor(x / cellSize);
-        int cellZ = (int) Math.floor(z / cellSize);
-        if (cellZ < 0 || cellZ >= currents.size()) {
+        int worldCellX = (int) Math.floor(x / cellSize);
+        int worldCellZ = (int) Math.floor(z / cellSize);
+
+        int rowOffset = currents.size() / 2;
+        int rowIndex = worldCellZ + rowOffset;
+        if (rowIndex < 0 || rowIndex >= currents.size()) {
             return Vector2.ZERO;
         }
-        List<Vector2> row = currents.get(cellZ);
-        if (cellX < 0 || cellX >= row.size()) {
+
+        List<Vector2> row = currents.get(rowIndex);
+        int colOffset = row.size() / 2;
+        int colIndex = worldCellX + colOffset;
+        if (colIndex < 0 || colIndex >= row.size()) {
             return Vector2.ZERO;
         }
-        return row.get(cellX);
+        return row.get(colIndex);
     }
 
     public CellIndex getCellIndex(double x, double z) {
-        return new CellIndex((int) Math.floor(x / cellSize), (int) Math.floor(z / cellSize));
+        int worldCellX = (int) Math.floor(x / cellSize);
+        int worldCellZ = (int) Math.floor(z / cellSize);
+        int rowOffset = currents.size() / 2;
+        int rowIndex = worldCellZ + rowOffset;
+        int colOffset = 0;
+        if (rowIndex >= 0 && rowIndex < currents.size()) {
+            colOffset = currents.get(rowIndex).size() / 2;
+        }
+        return new CellIndex(worldCellX + colOffset, rowIndex);
     }
 
     public record CellIndex(int x, int z) {
