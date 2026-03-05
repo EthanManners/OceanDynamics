@@ -1,5 +1,5 @@
 cellSize: 500
-tickInterval: 2
+tickInterval: 1
 activeTimeoutSeconds: 6
 
 currentPush: 0.055
@@ -18,6 +18,8 @@ windAgainstDrag: 0.03
 
 crewBonusMultiplier: 1.15
 maxHorizontalSpeed: 1.30
+maxAccelPerTick: 0.03
+velocitySmoothing: 0.12
 
 # 10x10 sample currents grid.
 # rows are z-index, columns are x-index.

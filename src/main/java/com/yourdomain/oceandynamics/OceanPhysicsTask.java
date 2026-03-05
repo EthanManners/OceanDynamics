@@ -33,51 +33,67 @@ public final class OceanPhysicsTask implements Runnable {
             }
 
             plugin.getActiveBoatManager().markActive(boat);
-            applyBoatPhysics(boat, cfg);
+            applyBoatPhysics(boat, entry, cfg);
             showCompassGuidance(boat, cfg);
         }
     }
 
-    private void applyBoatPhysics(Vehicle boat, OceanDynamicsConfig cfg) {
+    private void applyBoatPhysics(Vehicle boat, ActiveBoatManager.ActiveBoatEntry entry, OceanDynamicsConfig cfg) {
         Vector vel = boat.getVelocity();
         Vector2 horizontal = new Vector2(vel.getX(), vel.getZ());
-        double speed = horizontal.length();
+        Vector2 forwardDir = yawToDir(boat.getLocation().getYaw());
 
-        Vector2 referenceDir = speed > 1.0E-4 ? horizontal.normalize() : yawToDir(boat.getLocation().getYaw());
-        Vector2 currentCellVec = cfg.getCurrentAt(boat.getLocation().getX(), boat.getLocation().getZ());
+        Vector2 currentCellVec = entry.cachedCurrentAt(cfg, boat.getLocation().getX(), boat.getLocation().getZ());
         Vector2 currentBasePush = currentCellVec.multiply(cfg.currentPush);
         Vector2 windBasePush = plugin.getWindManager().getWindVector();
 
-        Vector2 pushed = horizontal;
-        pushed = applyAlignedForce(pushed, referenceDir, currentBasePush, cfg.currentWithMultiplier, cfg.currentAgainstDrag);
-        pushed = applyAlignedForce(pushed, referenceDir, windBasePush, cfg.windWithMultiplier, cfg.windAgainstDrag);
+        Vector2 boost = alignedBoost(currentBasePush, forwardDir, cfg.currentWithMultiplier, cfg.currentAgainstDrag)
+                .add(alignedBoost(windBasePush, forwardDir, cfg.windWithMultiplier, cfg.windAgainstDrag));
 
-        double cap = cfg.maxHorizontalSpeed;
-        if (hasCrewBonus(boat)) {
-            cap *= cfg.crewBonusMultiplier;
-            Vector2 forward = yawToDir(boat.getLocation().getYaw()).multiply(0.015 * (cfg.crewBonusMultiplier - 1.0) * 10.0);
-            pushed = pushed.add(forward);
+        boolean crewBonus = hasCrewBonus(boat);
+        if (crewBonus) {
+            boost = boost.add(forwardDir.multiply(0.004 * (cfg.crewBonusMultiplier - 1.0) * 10.0));
         }
 
-        pushed = clampHorizontal(pushed, cap);
-        boat.setVelocity(new Vector(pushed.x(), vel.getY(), pushed.z()));
+        boost = clampMagnitude(boost, cfg.maxAccelPerTick);
+
+        double speedCap = crewBonus ? cfg.maxHorizontalSpeed * cfg.crewBonusMultiplier : cfg.maxHorizontalSpeed;
+        Vector2 target = clampHorizontal(horizontal.add(boost), speedCap);
+        Vector2 next = lerp(horizontal, target, cfg.velocitySmoothing);
+
+        boat.setVelocity(new Vector(next.x(), vel.getY(), next.z()));
     }
 
-    private Vector2 applyAlignedForce(Vector2 velocity, Vector2 referenceDir, Vector2 basePush, double withMultiplier, double againstDrag) {
+    private Vector2 alignedBoost(Vector2 basePush, Vector2 forwardDir, double withMultiplier, double againstDrag) {
         if (basePush.length() < 1.0E-8) {
-            return velocity;
+            return Vector2.ZERO;
         }
-        Vector2 forceDir = basePush.normalize();
-        double alignment = referenceDir.dot(forceDir);
+
         Vector2 push = basePush;
-        Vector2 out = velocity;
+        double alignment = forwardDir.dot(basePush.normalize());
         if (alignment > 0.0) {
-            push = push.multiply(1.0 + alignment * (withMultiplier - 1.0));
-        } else if (alignment < 0.0) {
-            double dragFactor = Math.max(0.0, 1.0 - againstDrag * Math.abs(alignment));
-            out = out.multiply(dragFactor);
+            return push.multiply(1.0 + alignment * (withMultiplier - 1.0));
         }
-        return out.add(push);
+        if (alignment < 0.0) {
+            return push.multiply(Math.max(0.0, 1.0 - againstDrag * Math.abs(alignment)));
+        }
+        return push;
+    }
+
+    private Vector2 lerp(Vector2 from, Vector2 to, double alpha) {
+        double t = Math.max(0.0, Math.min(1.0, alpha));
+        return from.multiply(1.0 - t).add(to.multiply(t));
+    }
+
+    private Vector2 clampMagnitude(Vector2 v, double maxLen) {
+        if (maxLen <= 0.0) {
+            return Vector2.ZERO;
+        }
+        double len = v.length();
+        if (len > maxLen && len > 1.0E-8) {
+            return v.multiply(maxLen / len);
+        }
+        return v;
     }
 
     private void showCompassGuidance(Vehicle boat, OceanDynamicsConfig cfg) {

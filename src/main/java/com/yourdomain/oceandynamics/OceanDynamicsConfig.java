@@ -22,13 +22,15 @@ public final class OceanDynamicsConfig {
     public double windFixedValue;
     public double crewBonusMultiplier;
     public double maxHorizontalSpeed;
+    public double maxAccelPerTick;
+    public double velocitySmoothing;
     public int activeTimeoutSeconds;
     public List<List<Vector2>> currents;
 
     public static OceanDynamicsConfig from(FileConfiguration cfg) {
         OceanDynamicsConfig c = new OceanDynamicsConfig();
         c.cellSize = Math.max(1, cfg.getInt("cellSize", 500));
-        c.tickInterval = Math.max(1, cfg.getInt("tickInterval", 2));
+        c.tickInterval = Math.max(1, cfg.getInt("tickInterval", 1));
         c.currentPush = Math.max(0.0, cfg.getDouble("currentPush", 0.05));
         c.currentWithMultiplier = Math.max(1.0, cfg.getDouble("currentWithMultiplier", 1.8));
         c.currentAgainstDrag = Math.max(0.0, cfg.getDouble("currentAgainstDrag", 0.08));
@@ -42,9 +44,15 @@ public final class OceanDynamicsConfig {
         c.windFixedValue = Math.max(0.0, cfg.getDouble("windFixedStrength.value", 0.5));
         c.crewBonusMultiplier = Math.max(1.0, cfg.getDouble("crewBonusMultiplier", 1.15));
         c.maxHorizontalSpeed = Math.max(0.1, cfg.getDouble("maxHorizontalSpeed", 1.3));
+        c.maxAccelPerTick = Math.max(0.0, cfg.getDouble("maxAccelPerTick", 0.03));
+        c.velocitySmoothing = clamp01(cfg.getDouble("velocitySmoothing", 0.12));
         c.activeTimeoutSeconds = Math.max(1, cfg.getInt("activeTimeoutSeconds", 6));
         c.currents = parseCurrents(cfg.getList("currents"));
         return c;
+    }
+
+    private static double clamp01(double value) {
+        return Math.max(0.0, Math.min(1.0, value));
     }
 
     @SuppressWarnings("unchecked")
@@ -93,16 +101,18 @@ public final class OceanDynamicsConfig {
     }
 
     public Vector2 getCurrentAt(double x, double z) {
-        int cellX = (int) Math.floor(x / cellSize);
-        int cellZ = (int) Math.floor(z / cellSize);
-        if (cellZ < 0 || cellZ >= currents.size()) {
+        return getCurrentAtCell(getCellIndex(x, z));
+    }
+
+    public Vector2 getCurrentAtCell(CellIndex idx) {
+        if (idx.z() < 0 || idx.z() >= currents.size()) {
             return Vector2.ZERO;
         }
-        List<Vector2> row = currents.get(cellZ);
-        if (cellX < 0 || cellX >= row.size()) {
+        List<Vector2> row = currents.get(idx.z());
+        if (idx.x() < 0 || idx.x() >= row.size()) {
             return Vector2.ZERO;
         }
-        return row.get(cellX);
+        return row.get(idx.x());
     }
 
     public CellIndex getCellIndex(double x, double z) {

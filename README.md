@@ -33,11 +33,13 @@ Output jar is in `target/`.
 
 ## Config tuning tips
 
-- `tickInterval` defaults to `2` (10Hz) for better performance.
+- `tickInterval` defaults to `1` (every tick) for smooth acceleration; active-boat tracking keeps it cheap.
 - `currentPush` is the most important knob for “noticeable” currents.
 - `currentWithMultiplier` controls extra help when moving with a current.
 - `currentAgainstDrag` controls extra slowdown when fighting current.
 - `windPush` should usually stay weaker than currents.
+- `maxAccelPerTick` caps how much extra horizontal speed can be added each tick (anti-snap).
+- `velocitySmoothing` blends toward target velocity each tick (recommended `0.08` to `0.18`).
 - `maxHorizontalSpeed` protects against runaway acceleration.
 - `crewBonusMultiplier` should be modest (e.g. `1.10` to `1.25`).
 - Keep current vectors in the `[-0.2, 0.2]` range first, then tune.
