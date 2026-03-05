@@ -1,20 +1,17 @@
 # OceanDynamics
 
-OceanDynamics is a Paper 1.21.1 plugin that adds configurable ocean currents, global wind, and crew bonuses for boats/rafts.
+OceanDynamics is a Paper plugin for smooth, route-based ocean travel with **SpeedyBoats-style velocity override** in `VehicleMoveEvent`.
 
-## Features
+## Highlights
 
-- **Grid-based ocean currents** using a configurable 2D vector field (`cellSize` + `currents` grid).
-- **Global wind system** with direction/strength rerolled every `windChangeMinutes`.
-- **Performance-first active boat loop**: physics runs only for active boats, never for all entities.
-- **2-player crew bonus** for driver + passenger boats.
-- **Compass action bar guidance** while riding with a compass:
-  - mode toggle: `WIND` / `CURRENT`
-  - cardinal direction + degrees + strength
-- **Commands**:
-  - `/oceandynamics wind`
-  - `/oceandynamics reload`
-  - `/oceandynamics debug`
+- Tickless movement architecture for currents/wind (no repeating physics push loop).
+- 500x500 (configurable) current vector cells with O(1) lookup.
+- Global wind with random or gradual direction updates every N minutes.
+- Strong “with current fast / against current slow” behavior.
+- 2-player crew bonus multiplier.
+- Compass actionbar while riding:
+  - toggle between `WIND` and `CURRENT` via right-click compass
+  - displays 16-point heading + degrees + magnitude.
 
 ## Build
 
@@ -22,31 +19,36 @@ OceanDynamics is a Paper 1.21.1 plugin that adds configurable ocean currents, gl
 mvn clean package
 ```
 
-Output jar is in `target/`.
+Jar output: `target/OceanDynamics-1.0.0.jar`
 
 ## Install
 
-1. Build the jar with Maven.
-2. Drop `OceanDynamics-1.0.0.jar` into your server `plugins/` directory.
-3. Start/restart server.
-4. Edit `plugins/OceanDynamics/config.yml` and run `/oceandynamics reload`.
+1. Build the plugin.
+2. Copy jar to your Paper server `plugins/` folder.
+3. Start or restart the server.
+4. Edit `plugins/OceanDynamics/config.yml`.
+5. Run `/oceandynamics reload`.
 
-## Config tuning tips
+## Commands
 
-- `tickInterval` defaults to `2` (10Hz) for better performance.
-- `currentPush` is the most important knob for “noticeable” currents.
-- `currentWithMultiplier` controls extra help when moving with a current.
-- `currentAgainstDrag` controls extra slowdown when fighting current.
-- `windPush` should usually stay weaker than currents.
-- `maxHorizontalSpeed` protects against runaway acceleration.
-- `crewBonusMultiplier` should be modest (e.g. `1.10` to `1.25`).
-- Keep current vectors in the `[-0.2, 0.2]` range first, then tune.
+- `/oceandynamics reload` (permission: `oceandynamics.admin`)
+- `/oceandynamics wind`
+- `/oceandynamics debug`
 
-## Notes
+## Tuning advice
 
-- Currents apply in the overworld only.
-- Cell lookup uses floor division for negatives:
-  - `cellX = floor(x / cellSize)`
-  - `cellZ = floor(z / cellSize)`
-- Out-of-range cells safely default to zero current.
-- Compass mode preference is stored in memory per player.
+Start here for noticeable, controllable behavior:
+
+- `baseSpeed`: Always-on cruise speed. Raise to make ocean travel generally faster.
+- `currentPush` + `currentWithMultiplier`: Main route-learning reward knobs.
+- `currentAgainstPenalty`: Main anti-current slowdown knob.
+- `windPush` + `windWithMultiplier`: Secondary boost source.
+- `windAgainstPenalty`: Keep lower than current penalty for better feel.
+- `minSpeed`: Prevent total stall when heavily anti-aligned.
+- `maxSpeed` + `maxHorizontalSpeed`: Safety caps.
+- `driftScaleCurrent` / `driftScaleWind`: Small lateral realism; keep subtle.
+- `smoothingFactor`: 0.0 = immediate changes, ~0.15 = smoother cell transitions.
+
+## Architecture note
+
+Boat movement uses **boat facing direction** (`Location#getDirection`) and overrides horizontal velocity on `VehicleMoveEvent`, preserving Y velocity. This follows the SpeedyBoats-style approach for smooth handling without scheduler fight/jitter.
