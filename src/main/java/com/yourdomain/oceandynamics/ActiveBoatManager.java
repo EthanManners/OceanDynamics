@@ -70,6 +70,8 @@ public final class ActiveBoatManager {
         private Vehicle vehicle;
         private long lastSeenMovingMillis;
         private long lastDriverExitMillis;
+        private OceanDynamicsConfig.CellIndex cachedCell;
+        private Vector2 cachedCurrent = Vector2.ZERO;
 
         private ActiveBoatEntry(Vehicle vehicle) {
             this.vehicle = vehicle;
@@ -79,6 +81,15 @@ public final class ActiveBoatManager {
 
         public Vehicle vehicle() {
             return vehicle;
+        }
+
+        public Vector2 cachedCurrentAt(OceanDynamicsConfig cfg, double x, double z) {
+            OceanDynamicsConfig.CellIndex nextCell = cfg.getCellIndex(x, z);
+            if (!nextCell.equals(cachedCell)) {
+                cachedCell = nextCell;
+                cachedCurrent = cfg.getCurrentAtCell(nextCell);
+            }
+            return cachedCurrent;
         }
     }
 }
