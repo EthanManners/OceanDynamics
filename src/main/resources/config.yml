@@ -6,9 +6,9 @@ minSpeed: 0.25
 maxSpeed: 2.20
 maxHorizontalSpeed: 2.20
 
-# Minimum existing horizontal boat speed required before OceanDynamics takes over.
-# Prevents idle boats from auto-moving when a driver is seated.
-activationMinVanillaSpeed: 0.04
+
+# Driver must have this much speed in the boat forward direction before boosts apply.
+activationForwardSpeed: 0.01
 
 # Current and wind effects
 currentPush: 0.75

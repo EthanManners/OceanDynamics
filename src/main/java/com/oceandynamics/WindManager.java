@@ -35,8 +35,8 @@ public final class WindManager {
 
         String modeRaw = config.getString("windDirectionMode", "RANDOM");
         try {
-            this.directionMode = DirectionMode.valueOf(modeRaw.toUpperCase());
-        } catch (IllegalArgumentException ignored) {
+            this.directionMode = DirectionMode.valueOf(modeRaw == null ? "RANDOM" : modeRaw.toUpperCase());
+        } catch (RuntimeException ignored) {
             this.directionMode = DirectionMode.RANDOM;
         }
 

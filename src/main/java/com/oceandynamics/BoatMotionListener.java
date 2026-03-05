@@ -49,7 +49,7 @@ public final class BoatMotionListener implements Listener {
             clearBoatCache(boat.getUniqueId());
             return;
         }
-        if (!isDriverActivelyPropelling(boat)) {
+        if (!isDriverActivelyPropelling(boat, driver)) {
             clearBoatCache(boat.getUniqueId());
             return;
         }
@@ -63,6 +63,9 @@ public final class BoatMotionListener implements Listener {
         Vector current = currentField.getCurrentVector(boat.getLocation().getX(), boat.getLocation().getZ());
         Vector windVec = windManager.getWindVector();
 
+        double currentMag = current.clone().setY(0).length();
+        double windMag = windVec.clone().setY(0).length();
+
         double currentAlign = alignment(fwd, current);
         double windAlign = alignment(fwd, windVec);
 
@@ -72,14 +75,20 @@ public final class BoatMotionListener implements Listener {
 
         double speed = baseSpeed;
         speed += plugin.getConfig().getDouble("currentPush", 0.75)
+                * currentMag
                 * Math.max(0.0, currentAlign)
                 * plugin.getConfig().getDouble("currentWithMultiplier", 2.2);
         speed += plugin.getConfig().getDouble("windPush", 0.35)
+                * windMag
                 * Math.max(0.0, windAlign)
                 * plugin.getConfig().getDouble("windWithMultiplier", 1.5);
 
-        speed -= plugin.getConfig().getDouble("currentAgainstPenalty", 0.9) * Math.max(0.0, -currentAlign);
-        speed -= plugin.getConfig().getDouble("windAgainstPenalty", 0.35) * Math.max(0.0, -windAlign);
+        speed -= plugin.getConfig().getDouble("currentAgainstPenalty", 0.9)
+                * currentMag
+                * Math.max(0.0, -currentAlign);
+        speed -= plugin.getConfig().getDouble("windAgainstPenalty", 0.35)
+                * windMag
+                * Math.max(0.0, -windAlign);
 
         speed = clamp(speed, minSpeed, maxSpeed);
 
@@ -113,8 +122,8 @@ public final class BoatMotionListener implements Listener {
 
         if (isDebugEnabled(driver.getUniqueId())) {
             driver.sendActionBar(ChatColor.AQUA + "spd=" + fmt(speed)
-                    + ChatColor.GRAY + " curAlign=" + fmt(currentAlign)
-                    + ChatColor.GRAY + " windAlign=" + fmt(windAlign));
+                    + ChatColor.GRAY + " cur=" + fmt(currentMag) + "@" + fmt(currentAlign)
+                    + ChatColor.GRAY + " wind=" + fmt(windMag) + "@" + fmt(windAlign));
         }
     }
 
@@ -160,10 +169,20 @@ public final class BoatMotionListener implements Listener {
         lastSpeed.remove(boatId);
     }
 
-    private boolean isDriverActivelyPropelling(Boat boat) {
-        double activationMinVanillaSpeed = plugin.getConfig().getDouble("activationMinVanillaSpeed", 0.04);
-        Vector vel = boat.getVelocity().clone().setY(0);
-        return vel.lengthSquared() >= activationMinVanillaSpeed * activationMinVanillaSpeed;
+    private boolean isDriverActivelyPropelling(Boat boat, Player driver) {
+        Vector horizontalVelocity = boat.getVelocity().clone().setY(0);
+        if (horizontalVelocity.lengthSquared() < 1e-9) {
+            return false;
+        }
+
+        Vector forward = driver.getLocation().getDirection().setY(0);
+        if (forward.lengthSquared() < 1e-9) {
+            return false;
+        }
+
+        double forwardSpeed = horizontalVelocity.dot(forward.normalize());
+        double activationForwardSpeed = plugin.getConfig().getDouble("activationForwardSpeed", 0.01);
+        return forwardSpeed >= activationForwardSpeed;
     }
 
     private double alignment(Vector forward, Vector effect) {
