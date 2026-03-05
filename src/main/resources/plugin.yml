@@ -1,14 +1,15 @@
 name: OceanDynamics
 version: 1.0.0
-main: com.yourdomain.oceandynamics.OceanDynamics
+main: com.oceandynamics.OceanDynamics
 api-version: '1.21'
-author: yourdomain
-description: Ocean currents and global wind for boats and rafts.
+author: OceanDynamics
+website: https://example.com
+description: Smooth ocean currents + global wind for boats and rafts.
 
 commands:
   oceandynamics:
     description: OceanDynamics command root
-    usage: /oceandynamics <wind|reload|debug>
+    usage: /oceandynamics <reload|wind|debug>
     aliases: [od]
 
 permissions:
