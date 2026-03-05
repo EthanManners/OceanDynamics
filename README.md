@@ -1,52 +1,61 @@
 # OceanDynamics
 
-OceanDynamics is a Paper 1.21.1 plugin that adds configurable ocean currents, global wind, and crew bonuses for boats/rafts.
+OceanDynamics is a brand-new Paper plugin for **Minecraft 1.21.x** that adds meaningful ocean route gameplay via a current grid + global wind model.
+
+## Core design
+
+This plugin uses **VehicleMoveEvent velocity override (SpeedyBoats-style)** for smooth motion:
+- no repeating physics task that nudges boats,
+- velocity continuously aligned to boat facing direction,
+- currents/wind translated into stable forward speed changes.
+
+Speed adjustments only apply while the driver has forward motion in the boat's facing direction, so idle boats do not auto-cruise when a player is just seated.
 
 ## Features
 
-- **Grid-based ocean currents** using a configurable 2D vector field (`cellSize` + `currents` grid).
-- **Global wind system** with direction/strength rerolled every `windChangeMinutes`.
-- **Performance-first active boat loop**: physics runs only for active boats, never for all entities.
-- **2-player crew bonus** for driver + passenger boats.
-- **Compass action bar guidance** while riding with a compass:
-  - mode toggle: `WIND` / `CURRENT`
-  - cardinal direction + degrees + strength
+- **500x500 cell vector field currents** (configurable `cellSize` and full 2D vector grid).
+- **Global wind** with random or gradual direction updates every configurable minutes.
+- **With current fast / against current slow** speed model.
+- **2-player crew bonus** multiplier.
+- **Compass actionbar UI** while riding and holding a compass:
+  - `WIND` mode: direction + degrees + strength
+  - `CURRENT` mode: local cell current direction + degrees + magnitude
 - **Commands**:
-  - `/oceandynamics wind`
   - `/oceandynamics reload`
+  - `/oceandynamics wind`
   - `/oceandynamics debug`
 
 ## Build
 
 ```bash
-mvn clean package
+mvn package
 ```
 
-Output jar is in `target/`.
+The jar is produced under `target/`.
 
 ## Install
 
-1. Build the jar with Maven.
-2. Drop `OceanDynamics-1.0.0.jar` into your server `plugins/` directory.
-3. Start/restart server.
-4. Edit `plugins/OceanDynamics/config.yml` and run `/oceandynamics reload`.
+1. Build with Maven.
+2. Copy `target/OceanDynamics-1.0.0.jar` into `plugins/` on your Paper server.
+3. Start the server once.
+4. Edit `plugins/OceanDynamics/config.yml` as needed.
+5. Run `/oceandynamics reload`.
 
-## Config tuning tips
+## Tuning advice
 
-- `tickInterval` defaults to `2` (10Hz) for better performance.
-- `currentPush` is the most important knob for “noticeable” currents.
-- `currentWithMultiplier` controls extra help when moving with a current.
-- `currentAgainstDrag` controls extra slowdown when fighting current.
-- `windPush` should usually stay weaker than currents.
-- `maxHorizontalSpeed` protects against runaway acceleration.
-- `crewBonusMultiplier` should be modest (e.g. `1.10` to `1.25`).
-- Keep current vectors in the `[-0.2, 0.2]` range first, then tune.
+Start here for noticeable but controllable travel:
+
+- `baseSpeed`: your baseline cruise speed (always on).
+- `currentPush` + `currentWithMultiplier`: biggest contributor to route reward.
+- `currentAgainstPenalty`: make this meaningful so bad route choices are felt.
+- `windPush` and `windAgainstPenalty`: typically weaker than current effects.
+- `minSpeed` and `maxSpeed`: keep gameplay fair and avoid absurd boosts.
+- `crewBonusMultiplier`: keep modest (`1.10`–`1.25`).
+- `driftScaleCurrent` / `driftScaleWind`: leave low unless you want harder steering.
+- `smoothingFactor`: use around `0.15` if cell transitions feel abrupt.
 
 ## Notes
 
-- Currents apply in the overworld only.
-- Cell lookup uses floor division for negatives:
-  - `cellX = floor(x / cellSize)`
-  - `cellZ = floor(z / cellSize)`
-- Out-of-range cells safely default to zero current.
-- Compass mode preference is stored in memory per player.
+- Uses boat facing direction from `location.getDirection()` (not current velocity direction) to avoid feedback jitter.
+- Preserves vertical Y velocity while replacing horizontal XZ velocity each move event.
+- Out-of-grid lookups return zero current.
